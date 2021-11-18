@@ -1,6 +1,7 @@
 import cliente from "../Models/cliente.js"; // importamos el modelo cliente
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import role from "../Models/role.js";
 import moment from "moment";
 
 //creamos una variabe que almacene el regstro de un cliente en la bd
@@ -17,16 +18,51 @@ const registerCliente = async (required, response) => {
 
   const hash = await bcrypt.hash(required.body.password, 10);
 
+  const roleId = await role.findOne({ name: "user" });
+  if (!role) return res.status(400).send({ message: "No role was assigned" });
+
   const clienteSchema = new cliente({
     name: required.body.name,
     email: required.body.email,
     password: hash,
+    roleId: roleId._id,
     dbStatus: true,
   });
+
   const result = await clienteSchema.save();
   if (!result) return response.status(400).send("failed register");
 
   return response.status(200).send({ result });
+};
+
+//registrar admin
+const registerAdmin = async (req, res) => {
+  if (
+    !req.body.name ||
+    !req.body.email ||
+    !req.body.password ||
+    !req.body.roleId
+  )
+    return res.status(400).send({ message: "Incomplete data" });
+
+  const existingUser = await cliente.findOne({ email: req.body.email });
+  if (existingUser)
+    return res.status(400).send({ message: "The user is already registered" });
+
+  const passHash = await bcrypt.hash(req.body.password, 10);
+
+  const userRegister = new cliente({
+    name: req.body.name,
+    email: req.body.email,
+    password: passHash,
+    roleId: req.body.roleId,
+    dbStatus: true,
+  });
+
+  const result = await userRegister.save();
+  return !result
+    ? res.status(400).send({ message: "Failed to register user" })
+    : res.status(200).send({ result });
 };
 
 //listamos todos los clientes
@@ -113,4 +149,4 @@ const login = async (req, res) => {
   }
 };
 
-export default { registerCliente, listClientes, updateCliente, deleteCliente,login };
+export default { registerCliente, listClientes, updateCliente, deleteCliente,login,registerAdmin };
